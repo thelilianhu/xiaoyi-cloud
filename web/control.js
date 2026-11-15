@@ -57,6 +57,16 @@ function render(){
 }
 const chatNodes=new Map();
 let selectedQuery=sessionStorage.getItem('xiaoyi-selected-query');
+function flowSelection(next, previous, selected) {
+ const queries=next.queries||[];
+ const before=new Map((previous?.queries||[]).map(q=>[q.id,q]));
+ const changed=queries.filter(q=>{
+  const old=before.get(q.id);
+  return !old||q.status!==old.status||JSON.stringify(q.tasks)!==JSON.stringify(old.tasks);
+ });
+ const newest=list=>[...list].sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt))[0];
+ return newest(changed)?.id||queries.find(q=>q.id===selected)?.id||newest(queries)?.id||null;
+}
 function selectQuery(id){selectedQuery=id;sessionStorage.setItem('xiaoyi-selected-query',id);renderConversation();renderFlow();renderTaskNodes();}
 function friendlyStep(e){
  const states={queued:'等待开始',running:'正在处理',paused:'已暂停',succeeded:'已完成',completed:'回复已准备好',waiting_input:'等待你补充信息',failed:'未能完成，请稍后重试',cancelled:'已停止'};
@@ -121,7 +131,8 @@ function renderFlow(){
  taskLink.classList.toggle('link-returning',returning);
  $('link-input-router').classList.toggle('link-returning',returning);
  const activeTasks=snapshot.tasks.filter(t=>t.status==='running');const waitingTasks=snapshot.tasks.filter(t=>t.status==='waiting_input');
- $('flow-task').classList.remove('flow-active','is-flowing','flow-error','flow-visited');
+ $('flow-task').classList.toggle('flow-active',activeTasks.length>0);
+ $('flow-task').classList.toggle('is-flowing',activeTasks.length>0);
  if(activeTasks.length)taskLink.classList.add('link-active');
  const stateHasReply=returning&&Boolean(replyText);
  $('flow-state').classList.toggle('state-live',stateHasReply);
@@ -136,7 +147,7 @@ function renderFlow(){
 }
 function renderConversation(){
  const queries=(snapshot?.queries||[]).filter(q=>q.sessionId===sessionId);
- if(!selectedQuery||!snapshot.queries.some(q=>q.id===selectedQuery))selectedQuery=queries.at(-1)?.id||null;
+ if(!selectedQuery||!snapshot.queries.some(q=>q.id===selectedQuery))selectedQuery=flowSelection(snapshot,null,null);
  const container=$('conversation'),atBottom=container.scrollHeight-container.clientHeight-container.scrollTop<60;
  const ids=new Set(queries.map(q=>q.id));for(const [id,n]of chatNodes)if(!ids.has(id)){n.root.remove();chatNodes.delete(id);}
  container.querySelector('.chat-empty')?.remove();
@@ -188,16 +199,18 @@ async function refresh(){
  if(refreshing)return;refreshing=true;const scope=$('scope').value;
  try{
  const s=await api('/control/state'+(scope==='current'?'?sessionId='+encodeURIComponent(sessionId):''));if(scope!==$('scope').value)return;
+ selectedQuery=flowSelection(s,snapshot,selectedQuery);
  const previous=snapshot?.queries?.find(q=>q.id===selectedQuery);
  const nextQuery=s.queries?.find(q=>q.id===selectedQuery);
  const previousTaskStates=new Map((previous?.tasks||[]).map(t=>[t.id,t.status]));
- const runReturned=Boolean(previous&&nextQuery&&['queued','running'].includes(previous.status)&&nextQuery.status==='completed');
+ const runReturned=Boolean(snapshot&&nextQuery&&nextQuery.status==='completed'&&(!previous||['queued','running'].includes(previous.status)));
  const taskReturned=Boolean(nextQuery?.tasks?.some(t=>previousTaskStates.get(t.id)==='running'&&['succeeded','failed','cancelled'].includes(t.status)));
- if(runReturned||taskReturned){returnFlowUntil=Date.now()+1800;setTimeout(()=>{if(snapshot)renderFlow();},1850);}
+ if(runReturned||taskReturned){returnFlowUntil=Date.now()+3500;setTimeout(()=>{if(snapshot)renderFlow();},3550);}
  snapshot=s;
  $('connection').textContent='● 已连接 · '+(s.model||'模型未配置');$('scope-note').textContent=scope==='current'?'只看本页对话创建的任务':'查看全部会话的任务';$('updated').textContent='更新于 '+new Date().toLocaleTimeString();
- const next=JSON.stringify(s);if(next!==signature){signature=next;render();}
+ const next=JSON.stringify(s);if(next!==signature){signature=next;render();}else{renderFlow();}
  $('flow-input').classList.toggle('voice-active',Boolean(voiceSession||s.inputActive));
+ $('link-input-router').classList.toggle('link-active',Boolean(voiceSession||s.inputActive||sending||s.router.active||s.triggers.some(t=>t.status==='queued')));
 
  }catch(e){notice(e.message);$('connection').textContent='○ 连接异常';if(e.status===401){$('connection').textContent='○ 请在设置中更新访问口令';}}finally{refreshing=false;}
 }
@@ -234,7 +247,7 @@ function setChatVisible(visible){
  localStorage.setItem('celia-chat-visible',String(visible));
 }
 $('toggle-chat').onclick=()=>setChatVisible($('chat-panel').hidden);
-setChatVisible(localStorage.getItem('celia-chat-visible')!=='false');
+setChatVisible(false);
 
 const SpeechRecognitionAPI=window.SpeechRecognition||window.webkitSpeechRecognition;
 const voiceButton=$('hold-to-talk');
