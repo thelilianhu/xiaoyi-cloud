@@ -2,6 +2,12 @@ const $=id=>document.getElementById(id);
 const labels={queued:'排队中',running:'执行中',paused:'已暂停',succeeded:'已交付',failed:'失败',cancelled:'已取消',completed:'已回复',waiting_input:'等待补充'};
 const kinds={dispatch:'分发 Task',control:'调整 Task',query:'查询任务',clarify:'请求补充',local:'本地回复',routing:'路由中',failed:'路由失败',reply:'直接回复'};
 const eventLabels={submission_check:'校验任务登记并重试',started:'Router 开始处理',model_started:'模型开始处理',first_token:'收到首字',model_completed:'模型返回',tool_started:'调用工具',tool_result:'工具返回',direct_acknowledgement:'任务即时确认',fast_route:'本地快速通道',completed:'回复完成',waiting_input:'等待补充',failed:'失败',cancelled:'已取消'};
+// A personal setup fragment is consumed locally; it is never sent to the server.
+const setupAccess=new URLSearchParams(location.hash.slice(1)).get('access');
+if(setupAccess){
+ history.replaceState(null,'',location.pathname+location.search);
+ localStorage.setItem('xiaoyi-lab-access-token',setupAccess);
+}
 let token=localStorage.getItem('xiaoyi-lab-access-token')||'';
 const sessionId='control-router';
 $('scope').value='all';
@@ -193,7 +199,7 @@ async function refresh(){
  const next=JSON.stringify(s);if(next!==signature){signature=next;render();}
  $('flow-input').classList.toggle('voice-active',Boolean(voiceSession||s.inputActive));
 
- }catch(e){notice(e.message);$('connection').textContent='○ 连接异常';if(e.status===401&&!$('config').open)$('config').showModal();}finally{refreshing=false;}
+ }catch(e){notice(e.message);$('connection').textContent='○ 连接异常';if(e.status===401){$('connection').textContent='○ 请在设置中更新访问口令';}}finally{refreshing=false;}
 }
 let composing=false;
 $('input').addEventListener('compositionstart',()=>{composing=true;});
@@ -217,7 +223,7 @@ $('clear-tasks').onclick=async()=>{
  catch(error){notice(error.message);}
  finally{$('clear-tasks').disabled=false;}
 };
-async function loadDefaultAccess(){try{const r=await fetch('/control/local-access',{cache:'no-store'});if(r.ok){const d=await r.json();if(d.accessToken){token=d.accessToken;localStorage.setItem('xiaoyi-lab-access-token',token);$('token').value=token;}}}catch{}finally{refresh();}}
+async function loadDefaultAccess(){if(token){refresh();return;}try{const r=await fetch('/control/local-access',{cache:'no-store'});if(r.ok){const d=await r.json();if(d.accessToken){token=d.accessToken;localStorage.setItem('xiaoyi-lab-access-token',token);$('token').value=token;}}}catch{}finally{refresh();}}
 setBusy();loadDefaultAccess();setInterval(()=>{if(!document.hidden&&!$('config').open)refresh();},500);
 
 function setChatVisible(visible){
