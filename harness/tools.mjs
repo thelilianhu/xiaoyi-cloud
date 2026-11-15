@@ -13,7 +13,7 @@ export const definitions = [
  define('get_task', '读取当前会话内任务的完整结果和最新版本。', {taskId:id}),
  define('create_text_task', '仅用于用户明确要求的纯文字写作、总结、分析任务。计划、攻略、方案同样属于文字任务。主题与产出意图已明确就先创建初稿，可默认的细节不要先追问。输入必须自包含，包含此前确认的要求，并明确区分默认假设。不支持发送、文件读写、相册、联网或定时执行。', {input:string, name:{type:'string', minLength:1, maxLength:60, description:'只写用户目标，例如上海三日游攻略。不要加异步、后台、模拟、演示等实现词，建议4–16字。'}}, ['input']),
  define('create_phone_task', '创建产品 Demo 的模拟操作任务。用户要求相册查找、照片筛选整理、视频生成、图像生成、PPT文件制作、邮件处理、应用操控、设备控制、预订、发送、文件导出等尚未接入的执行能力时使用，按用户目标演示步骤；后台逐步模拟打开应用、点击、输入、确认。没有真实手机、订单或支付，仅演示；不要因未接入真实应用而拒绝模拟。', {input:string,plan:{type:'string',minLength:1,maxLength:2000,description:'按本次任务生成4至10个具体执行步骤，每行一步，只写动作，不要标题或解释。'},name:{type:'string',minLength:1,maxLength:60}}, ['input']),
- define('control_task', '用户要求修改、暂停、恢复、取消或重试任务时调用。先读取最新任务版本。所有已提交任务均可用 update 修改，input 写入完整的新要求，并通过 name 提供反映最新目标的简短名称。执行中任务会停止旧执行并按新要求重跑；已完成、失败、取消任务重新排队；暂停任务保留暂停。保持同一 Task，旧结果自动保留。执行中的任务不能暂停。', {taskId:id,plan:{type:'string',minLength:1,maxLength:2000,description:'修改模拟任务时按新要求重写步骤，每行一步。'}, action:{type:'string', enum:['update','pause','resume','cancel','retry']}, version:{type:'integer', minimum:0}, input:string, name:{type:'string',minLength:1,maxLength:60,description:'更新后的任务名称，只描述最新目标或交付物，不写实现词。'}}, ['taskId','action','version']),
+ define('control_task', '用户要求修改、暂停、恢复、取消或重试任务时调用。先读取最新任务版本。仅未结束的任务可用 update 修改，input 写入完整的新要求，并通过 name 提供反映最新目标的简短名称。执行中任务会停止旧执行并按新要求重跑；已完成、失败、取消任务不可重新执行，必须创建新任务；暂停任务保留暂停。保持同一 Task，旧结果自动保留。执行中的任务不能暂停。', {taskId:id,plan:{type:'string',minLength:1,maxLength:2000,description:'修改模拟任务时按新要求重写步骤，每行一步。'}, action:{type:'string', enum:['update','pause','resume','cancel','retry']}, version:{type:'integer', minimum:0}, input:string, name:{type:'string',minLength:1,maxLength:60,description:'更新后的任务名称，只描述最新目标或交付物，不写实现词。'}}, ['taskId','action','version']),
  define('ask_user', '仅在缺少不可替代的材料、无法识别主题、已有任务指代不明确或安全必需信息缺失时追问。可合理默认的目标、篇幅、风格、频次不得阻塞初稿创建。任务内追问必须传 taskId，归属原 Task；尚未创建但主题已明确时，传 input（现有需求）和 name 先建立等待补充的 Task。仅任务指代不明或完全无主题时可不关联任务。必须单独调用，不能与其他工具一起调用。', {question:string,taskId:id,input:string,name:{type:'string',minLength:1,maxLength:60}}, ['question'])
 ];
 function validate(call) {
@@ -53,11 +53,16 @@ export function toolRegistry(queue) {
      const requestId = 'agent-' + createHash('sha256').update(runId + '\0' + args.input).digest('hex');
      return {task:compact(queue.create({input:args.input, name:args.name, sessionId, requestId,simulationPlan:args.plan,searchQuery:args.query,kind:call.function.name==='create_research_task'?'research':call.function.name==='create_phone_task'?'phone_simulation':'text'}))};
     }
-    case 'control_task': ownTask(args.taskId); return {task:compact(queue.action(args.taskId, args.action, args))};
+    case 'control_task': {
+     const task=ownTask(args.taskId);
+     if(['succeeded','failed','cancelled'].includes(task.status))throw new TaskError(409,'此任务已结束，请保留原任务并使用创建工具新建任务；不要重试修改旧任务。');
+     return {task:compact(queue.action(args.taskId, args.action, args))};
+    }
     case 'ask_user': {
      if(args.taskId&&args.input)throw new TaskError(400,'追问不能同时指定已有任务和新任务。');
      let task=args.taskId?ownTask(args.taskId):null;
      if(!task&&args.input)task=queue.create({input:args.input,name:args.name,sessionId,requestId:'question-'+runId});
+     if(task&&['succeeded','failed','cancelled'].includes(task.status))throw new TaskError(409,'此任务已结束。新的需求请创建新任务，不要重新开启旧任务的追问。');
      if(task)task=queue.ask(task.id,args.question,runId);
      return {question:args.question,waitingForUser:true,...(task?{task:compact(task)}:{})};
     }

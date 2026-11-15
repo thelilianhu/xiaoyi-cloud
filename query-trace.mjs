@@ -14,7 +14,7 @@ export function queryTrace(trigger,run,tasks=[],partial=''){
  const executing=linked.filter(t=>active.has(t.status));
  if(executing.length){stages.push('task');if(!status||status==='completed'){status='running';label='Task 执行中';}else label+=' · Task 执行中';}
  if(!stages.length&&linked.some(t=>['failed','cancelled','paused'].includes(t.status))){stages.push('task');status=linked.some(t=>t.status==='failed')?'failed':linked.some(t=>t.status==='paused')?'paused':'cancelled';label=status==='failed'?'Task 失败':status==='paused'?'Task 已暂停':'Task 已取消';}
- if(!stages.length){stages.push('return');status='completed';label=linked.length?'Task 已交付':'回复已返回';}
+ if(!stages.length){stages.push('return');status='completed';label=linked.length?'Task 已完成':'回复已返回';}
  if(run?.output||linked.some(t=>t.result))visited.push('return');
  return {id:trigger.id,runId:run?.id||null,sessionId:trigger.sessionId,input:trigger.message,createdAt:trigger.createdAt,status,label,stages:[...new Set(stages)],visited,reply:run?.output||partial||'',error:run?.error||trigger.error||null,tasks:linked.map(t=>({id:t.id,name:t.name,status:t.status,input:t.input,result:t.result,error:t.error,pendingQuestion:t.pendingQuestion}))};
 }
