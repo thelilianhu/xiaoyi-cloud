@@ -138,3 +138,13 @@ dialog{background:#142136;color:#e2e8f0;border:1px solid #405571}dialog::backdro
 .control-workspace #flow-services{grid-column:1/-1}
 .control-workspace #flow-services[hidden]{display:none}
 @media(max-width:520px){.control-workspace #flow-router{padding:12px;gap:4px 8px}.control-workspace #router-model{max-width:140px;overflow-wrap:anywhere}}
+
+/* Stable module geometry: updates never resize the flow diagram. */
+.control-workspace #flow-router{height:248px;min-height:248px;max-height:248px;box-sizing:border-box;grid-template-rows:32px 32px 24px minmax(0,1fr);align-content:start;flex-shrink:0}
+.control-workspace #flow-router>.router-decisions{grid-row:2;margin:0;overflow:hidden}
+.control-workspace #router-state{grid-row:3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.control-workspace #router-steps,.control-workspace #flow-router .router-services{grid-row:4;grid-column:1/-1;height:100%;min-height:0;max-height:none;box-sizing:border-box;overflow:auto;margin:0;align-self:stretch}
+.control-workspace #router-steps[hidden],.control-workspace #flow-services[hidden]{display:none}
+.control-workspace #flow-task{height:264px;min-height:264px;max-height:264px;box-sizing:border-box;overflow:auto;flex-shrink:0}
+.control-workspace #query-focus{height:48px;min-height:48px;max-height:48px;box-sizing:border-box;overflow:auto;flex-shrink:0}
+#link-router-task.link-idle{visibility:hidden}

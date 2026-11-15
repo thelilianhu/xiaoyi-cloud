@@ -127,21 +127,25 @@ function renderFlow(){
  const moving=Boolean(q&&['queued','running'].includes(q.status));
  for(const stage of ['input','router','task','return'])$('flow-'+stage).classList.toggle('is-flowing',stage==='router'?routerBusy||moving&&q?.stages.includes(stage):moving&&q.stages.includes(stage));
  const taskLink=$('link-router-task');
- taskLink.classList.toggle('link-active',routerBusy||moving&&q?.stages.some(stage=>stage==='router'||stage==='task'));
+ const tasksExecuting=snapshot.tasks.some(t=>['queued','running'].includes(t.status));
+ const taskReturning=returning&&Boolean(q?.tasks?.some(t=>t.result||t.error));
+ taskLink.classList.toggle('link-active',tasksExecuting&&!taskReturning);
+ taskLink.classList.toggle('link-idle',!tasksExecuting&&!taskReturning);
  taskLink.classList.toggle('link-visited',Boolean(q?.visited.some(stage=>stage==='router'||stage==='task')));
  // 回传箭头只在真实状态刚刚完成切换的短暂窗口内移动；历史记录只保留静态路径。
- taskLink.classList.toggle('link-returning',returning);
+ taskLink.classList.toggle('link-returning',taskReturning);
  $('link-input-router').classList.toggle('link-returning',returning);
  const activeTasks=snapshot.tasks.filter(t=>t.status==='running');const waitingTasks=snapshot.tasks.filter(t=>t.status==='waiting_input');
  $('flow-task').classList.toggle('flow-active',activeTasks.length>0);
  $('flow-task').classList.toggle('is-flowing',activeTasks.length>0);
- if(activeTasks.length)taskLink.classList.add('link-active');
+ 
  const stateHasReply=returning&&Boolean(replyText);
  $('flow-state').classList.toggle('state-live',stateHasReply);
  $('flow-state').classList.remove('flow-active');
  $('state-summary').textContent=stateHasReply?'本轮结果已归档，可随时继续修改':'任务、步骤与结果自动保存';
  $('reply-preview').textContent=replyText?replyText.replace(/\s+/g,' ').slice(0,96)+(replyText.length>96?'…':''):'等待 Router 回复';
  $('flow-services').hidden=!returning;
+ $('router-steps').hidden=returning;
  $('flow-reply').classList.toggle('flow-active',returning&&Boolean(replyText));
  $('flow-reply').classList.remove('flow-visited');
  $('flow-reply').classList.toggle('is-flowing',returning&&Boolean(replyText));
