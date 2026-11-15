@@ -1,7 +1,7 @@
 import {setTimeout as delay} from 'node:timers/promises';
 // In-memory simulation only. This module has no device, network or payment API.
 export async function simulatePhone(task, signal, report, stepMs=3000) {
- const app=task.input.match(/淘宝|小红书|京东|美团|饿了么|拼多多|微信|支付宝/)?.[0]||'任务工作区';
+ const app=task.input.match(/淘宝|小红书|京东|美团|饿了么|拼多多|微信|支付宝/)?.[0]||task.input.match(/(?:去|打开|进入|使用)\s*[「“"]?([^\n，。！？「」“”"]{1,24}?)[」”"]?\s*(?:应用|App|APP)/)?.[1]?.trim()||'任务工作区';
  const shopping=/买|购买|下单|牛奶|购物/.test(task.input);
  const defaultSteps=shopping?[
   ['open_app','打开应用',app,'应用启动页'],
