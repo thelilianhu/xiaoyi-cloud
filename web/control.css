@@ -123,3 +123,18 @@ dialog{background:#142136;color:#e2e8f0;border:1px solid #405571}dialog::backdro
 
 /* 分派沿箭头向下流动；结果归档后沿同一条线路向上回传。 */
 .flow-link.link-returning{overflow:visible;color:#7dd3fc}.flow-link.link-returning::after{content:'↑';position:absolute;z-index:2;left:calc(50% + 9px);top:7px;width:auto;height:auto;background:transparent;color:#7dd3fc;font-size:15px;line-height:1;text-shadow:0 0 10px #38bdf8;animation:flow-return-up 1.25s linear infinite}@keyframes flow-return-up{0%{transform:translateY(17px);opacity:0}18%{opacity:1}82%{opacity:1}100%{transform:translateY(-17px);opacity:0}}@media(prefers-reduced-motion:reduce){.flow-link.link-returning::after{animation:none;opacity:1;transform:none}}
+
+/* A wider Router keeps its summary and recent steps compact. */
+.control-workspace #flow-router{width:100%;max-width:720px;padding:12px 20px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:4px 12px;text-align:left}
+.control-workspace #flow-router>.dot{grid-column:1;grid-row:1}
+.control-workspace #flow-router>h3{grid-column:2;grid-row:1;font-size:24px;margin:0}
+.control-workspace #router-model{grid-column:3;grid-row:1}
+.control-workspace #flow-router>.router-decisions{grid-column:1/-1;font-size:11px;line-height:1.5}
+.control-workspace #router-state{grid-column:1/-1;margin:0}
+.control-workspace #router-steps{grid-column:1/-1;max-height:112px;overflow:auto}
+.control-workspace #router-steps .step-info{margin-top:4px;padding-top:4px}
+.control-workspace #router-steps .step-list{margin:4px 0;padding-bottom:0}
+.control-workspace #router-steps li{margin-bottom:4px}
+.control-workspace #flow-services{grid-column:1/-1}
+.control-workspace #flow-services[hidden]{display:none}
+@media(max-width:520px){.control-workspace #flow-router{padding:12px;gap:4px 8px}.control-workspace #router-model{max-width:140px;overflow-wrap:anywhere}}

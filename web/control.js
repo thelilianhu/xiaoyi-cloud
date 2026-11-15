@@ -62,7 +62,7 @@ function flowSelection(next, previous, selected) {
  const before=new Map((previous?.queries||[]).map(q=>[q.id,q]));
  const changed=queries.filter(q=>{
   const old=before.get(q.id);
-  return !old||q.status!==old.status||JSON.stringify(q.tasks)!==JSON.stringify(old.tasks);
+  return !old||q.status!==old.status||q.reply!==old.reply||q.error!==old.error||JSON.stringify(q.tasks)!==JSON.stringify(old.tasks);
  });
  const newest=list=>[...list].sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt))[0];
  return newest(changed)?.id||queries.find(q=>q.id===selected)?.id||newest(queries)?.id||null;
@@ -110,7 +110,9 @@ function renderTaskNodes(){
 function renderFlow(){
  const q=snapshot?.queries?.find(q=>q.id===selectedQuery);
  const replyText=q?.tasks?.find(t=>t.result)?.result||q?.reply||q?.error||q?.tasks?.find(t=>t.pendingQuestion)?.pendingQuestion||'';
- const returning=Date.now()<returnFlowUntil;
+ const replyRun=snapshot.decisions.find(r=>r.id===q?.runId);
+ const streaming=Boolean(q?.reply&&['queued','running'].includes(replyRun?.status));
+ const returning=streaming||Date.now()<returnFlowUntil;
  // Router 是全局单例：即使当前没有选中刚提交的那条对话，也必须反映真实的处理中状态。
  const routerBusy=sending||Date.now()<routerHighlightUntil||Boolean(snapshot?.router?.active)||snapshot?.triggers?.some(t=>t.status==='routing')||snapshot?.decisions?.some(r=>['queued','running'].includes(r.status));
  for(const stage of ['input','router','task','return']){
@@ -142,6 +144,7 @@ function renderFlow(){
  $('flow-services').hidden=!returning;
  $('flow-reply').classList.toggle('flow-active',returning&&Boolean(replyText));
  $('flow-reply').classList.remove('flow-visited');
+ $('flow-reply').classList.toggle('is-flowing',returning&&Boolean(replyText));
  const currentStep=returning&&q?`当前步骤 · ${q.label}：Router 已读取记录并已回复对话`:'等待新的状态流转';
  $('query-focus').textContent=activeTasks.length?'后台正在执行 '+activeTasks.length+' 个任务 · '+activeTasks.map(t=>t.name||'任务').join('、')+(waitingTasks.length?' · '+waitingTasks.length+' 个等待补充':''):waitingTasks.length?waitingTasks.length+' 个任务等待你补充信息':currentStep;
 }
@@ -205,7 +208,8 @@ async function refresh(){
  const previousTaskStates=new Map((previous?.tasks||[]).map(t=>[t.id,t.status]));
  const runReturned=Boolean(snapshot&&nextQuery&&nextQuery.status==='completed'&&(!previous||['queued','running'].includes(previous.status)));
  const taskReturned=Boolean(nextQuery?.tasks?.some(t=>previousTaskStates.get(t.id)==='running'&&['succeeded','failed','cancelled'].includes(t.status)));
- if(runReturned||taskReturned){returnFlowUntil=Date.now()+3500;setTimeout(()=>{if(snapshot)renderFlow();},3550);}
+ const replyChanged=Boolean(snapshot&&nextQuery&&((nextQuery.reply&&nextQuery.reply!==previous?.reply)||(nextQuery.error&&nextQuery.error!==previous?.error)||nextQuery.tasks?.some(t=>(t.result&&t.result!==previous?.tasks?.find(old=>old.id===t.id)?.result)||(t.pendingQuestion&&t.pendingQuestion!==previous?.tasks?.find(old=>old.id===t.id)?.pendingQuestion))));
+ if(runReturned||taskReturned||replyChanged){returnFlowUntil=Date.now()+3500;setTimeout(()=>{if(snapshot)renderFlow();},3550);}
  snapshot=s;
  $('connection').textContent='● 已连接 · '+(s.model||'模型未配置');$('scope-note').textContent=scope==='current'?'只看本页对话创建的任务':'查看全部会话的任务';$('updated').textContent='更新于 '+new Date().toLocaleTimeString();
  const next=JSON.stringify(s);if(next!==signature){signature=next;render();}else{renderFlow();}
