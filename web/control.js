@@ -56,6 +56,7 @@ function render(){
  if(detailSelection?.type==='task')renderTaskDetail(detailSelection.id);
 }
 const chatNodes=new Map();
+let dispatchFlowUntil=0,inputFlowUntil=0,returnArrowUntil=0;
 let selectedQuery=sessionStorage.getItem('xiaoyi-selected-query');
 function flowSelection(next, previous, selected) {
  const queries=next.queries||[];
@@ -128,16 +129,19 @@ function renderFlow(){
  for(const stage of ['input','router','task','return'])$('flow-'+stage).classList.toggle('is-flowing',stage==='router'?routerBusy||moving&&q?.stages.includes(stage):moving&&q.stages.includes(stage));
  const taskLink=$('link-router-task');
  const tasksExecuting=snapshot.tasks.some(t=>['queued','running'].includes(t.status));
- const taskReturning=returning&&Boolean(q?.tasks?.some(t=>t.result||t.error));
- taskLink.classList.toggle('link-active',tasksExecuting&&!taskReturning);
- taskLink.classList.toggle('link-idle',!tasksExecuting&&!taskReturning);
+ const arrowReturning=returning&&Date.now()<returnArrowUntil;
+ const taskReturning=arrowReturning&&Boolean(q?.tasks?.some(t=>t.result||t.error));
+ const dispatching=tasksExecuting&&Date.now()<dispatchFlowUntil;
+ taskLink.classList.toggle('link-active',dispatching&&!taskReturning);
+ taskLink.classList.toggle('link-idle',!dispatching&&!taskReturning);
  taskLink.classList.toggle('link-visited',Boolean(q?.visited.some(stage=>stage==='router'||stage==='task')));
  // 回传箭头只在真实状态刚刚完成切换的短暂窗口内移动；历史记录只保留静态路径。
  taskLink.classList.toggle('link-returning',taskReturning);
- $('link-input-router').classList.toggle('link-returning',returning);
+ $('link-input-router').classList.toggle('link-returning',arrowReturning);
+ $('link-input-router').classList.toggle('link-idle',!arrowReturning&&Date.now()>=inputFlowUntil);
  const activeTasks=snapshot.tasks.filter(t=>t.status==='running');const waitingTasks=snapshot.tasks.filter(t=>t.status==='waiting_input');
- $('flow-task').classList.toggle('flow-active',activeTasks.length>0);
- $('flow-task').classList.toggle('is-flowing',activeTasks.length>0);
+ $('flow-task').classList.remove('flow-active');
+ $('flow-task').classList.remove('is-flowing');
  
  const stateHasReply=returning&&Boolean(replyText);
  $('flow-state').classList.toggle('state-live',stateHasReply);
@@ -206,6 +210,12 @@ async function refresh(){
  if(refreshing)return;refreshing=true;const scope=$('scope').value;
  try{
  const s=await api('/control/state'+(scope==='current'?'?sessionId='+encodeURIComponent(sessionId):''));if(scope!==$('scope').value)return;
+ if(snapshot){
+  const knownQueries=new Set((snapshot.queries||[]).map(q=>q.id));
+  const knownTasks=new Set(snapshot.tasks.map(t=>t.id));
+  if(s.queries?.some(q=>!knownQueries.has(q.id)))inputFlowUntil=Date.now()+5000;
+  if(s.tasks.some(t=>!knownTasks.has(t.id)))dispatchFlowUntil=Date.now()+5000;
+ }
  selectedQuery=flowSelection(s,snapshot,selectedQuery);
  const previous=snapshot?.queries?.find(q=>q.id===selectedQuery);
  const nextQuery=s.queries?.find(q=>q.id===selectedQuery);
@@ -213,12 +223,13 @@ async function refresh(){
  const runReturned=Boolean(snapshot&&nextQuery&&nextQuery.status==='completed'&&(!previous||['queued','running'].includes(previous.status)));
  const taskReturned=Boolean(nextQuery?.tasks?.some(t=>previousTaskStates.get(t.id)==='running'&&['succeeded','failed','cancelled'].includes(t.status)));
  const replyChanged=Boolean(snapshot&&nextQuery&&((nextQuery.reply&&nextQuery.reply!==previous?.reply)||(nextQuery.error&&nextQuery.error!==previous?.error)||nextQuery.tasks?.some(t=>(t.result&&t.result!==previous?.tasks?.find(old=>old.id===t.id)?.result)||(t.pendingQuestion&&t.pendingQuestion!==previous?.tasks?.find(old=>old.id===t.id)?.pendingQuestion))));
+ if(runReturned||taskReturned||(replyChanged&&!previous?.reply))returnArrowUntil=Date.now()+5000;
  if(runReturned||taskReturned||replyChanged){returnFlowUntil=Date.now()+3500;setTimeout(()=>{if(snapshot)renderFlow();},3550);}
  snapshot=s;
  $('connection').textContent='● 已连接 · '+(s.model||'模型未配置');$('scope-note').textContent=scope==='current'?'只看本页对话创建的任务':'查看全部会话的任务';$('updated').textContent='更新于 '+new Date().toLocaleTimeString();
  const next=JSON.stringify(s);if(next!==signature){signature=next;render();}else{renderFlow();}
  $('flow-input').classList.toggle('voice-active',Boolean(voiceSession||s.inputActive));
- $('link-input-router').classList.toggle('link-active',Boolean(voiceSession||s.inputActive||sending||s.router.active||s.triggers.some(t=>t.status==='queued')));
+ $('link-input-router').classList.toggle('link-active',Date.now()<inputFlowUntil);
 
  }catch(e){notice(e.message);$('connection').textContent='○ 连接异常';if(e.status===401){$('connection').textContent='○ 请在设置中更新访问口令';}}finally{refreshing=false;}
 }
