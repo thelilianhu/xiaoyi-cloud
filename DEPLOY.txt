@@ -1,0 +1,28 @@
+小艺后台在线部署包
+
+本包只含服务源码，不含模型密钥、访问口令、历史对话或本机代理配置。
+
+方案一：Render
+将本目录作为私有代码仓库根目录，使用 render.yaml 创建 Blueprint。
+配置 MODEL_API_KEY（DeepSeek 模型密钥）。平台会生成 API_ACCESS_TOKEN。
+模板为单实例付费服务＋1GB 持久化盘；请在平台确认实际费用后创建。
+部署成功后打开 https://你的域名/control，在设置里填 API_ACCESS_TOKEN。
+手机与网页的回复服务地址改成 https://你的域名，填写相同访问口令。
+若网页放在不同域名，给后台设置 ALLOWED_ORIGINS=该网页的完整来源地址。
+不要把 Mac 的 127.0.0.1:7890 代理带到云端。
+
+方案二：现有服务器
+本目录是 Docker 构建上下文。使用反向代理配置 HTTPS，持久化盘挂载到 /data。
+配置 MODEL_BASE_URL=https://api.deepseek.com、MODEL_NAME=deepseek-flash、MODEL_THINKING=disabled、MODEL_API_KEY、随机 API_ACCESS_TOKEN。
+单个实例运行，避免多个进程同时写文件。不要公开 4390 端口绕过 HTTPS。
+
+验证
+/readyz 返回 ready:true；无口令访问 /control/state 应返回401。
+带口令测试普通对话、并行任务、取消、重启后读取历史。
+首次部署默认空历史；迁移旧数据需在任务空闲时同时迁移 tasks、harness 和 inbox 文件。
+模型密钥仅配置在云平台，不放在仓库或前端。
+
+限制
+这是单用户私有 Demo，共享口令不提供多用户数据隔离。
+服务重启会保留历史和排队任务；正在执行的任务标为中断，需重试，不会自动重放外部操作。
+本机已装 iOS 无需重新编译即可在设置里更改服务地址。云端地址确认前保留本机配置。

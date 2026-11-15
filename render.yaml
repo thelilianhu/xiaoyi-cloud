@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: xiaoyi-harness
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    region: singapore
+    numInstances: 1
+    healthCheckPath: /readyz
+    disk:
+      name: task-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: MODEL_BASE_URL
+        value: https://api.deepseek.com
+      - key: MODEL_NAME
+        value: deepseek-flash
+      - key: MODEL_THINKING
+        value: disabled
+      - key: INBOX_STORE_PATH
+        value: /data/inbox.json
+      - key: MODEL_API_KEY
+        sync: false
+      - key: API_ACCESS_TOKEN
+        generateValue: true

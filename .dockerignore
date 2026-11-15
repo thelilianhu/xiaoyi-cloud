@@ -1,0 +1,12 @@
+.env
+.env.*
+node_modules
+.git
+data
+output
+outputs
+*.log
+*.zip
+
+**/*.test.mjs
+.DS_Store
