@@ -148,3 +148,9 @@ dialog{background:#142136;color:#e2e8f0;border:1px solid #405571}dialog::backdro
 .control-workspace #flow-task{height:264px;min-height:264px;max-height:264px;box-sizing:border-box;overflow:auto;flex-shrink:0}
 .control-workspace #query-focus{height:48px;min-height:48px;max-height:48px;box-sizing:border-box;overflow:auto;flex-shrink:0}
 #link-router-task.link-idle{visibility:hidden}
+
+/* Router is a compact peer of the input node; detailed steps stay in the journal. */
+.control-workspace #flow-router{height:96px;min-height:96px;max-height:96px;grid-template-rows:32px 24px;align-content:center;padding:12px 20px;gap:4px 12px}
+.control-workspace #flow-router>.router-decisions,.control-workspace #flow-router>#router-steps,.control-workspace #flow-router>#flow-services{display:none}
+.control-workspace #flow-router>#router-state{grid-row:2;grid-column:1/-1}
+@media(max-width:520px){.control-workspace #flow-router{height:88px;min-height:88px;max-height:88px;padding:8px 12px}}
