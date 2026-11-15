@@ -18,6 +18,9 @@ import { completionDeltas } from './stream.mjs';
 import { Agent } from 'undici';
 const modelConnections = new Agent({connect:{timeout:30000,family:4}});
 const inputPresence = new Map();
+const presenceListeners = new Set();
+const notifyPresence = () => { for (const emit of presenceListeners) emit(); };
+setInterval(notifyPresence, 500).unref();
 const port = Number(process.env.PORT || 4390);
 const localAccess = createLocalAccess(port);
 const host = process.env.HOST || '127.0.0.1';
@@ -109,11 +112,21 @@ const server = http.createServer(async (req, res) => {
   send(200,{accessToken:token||''});return;
  }
  if(req.url==='/health'){send(200,{ready:Boolean(process.env.MODEL_API_KEY&&process.env.MODEL_NAME),model:process.env.MODEL_NAME||null});return;}
+ if(req.method==='GET'&&new URL(req.url,'http://localhost').pathname==='/control/presence-stream'){
+  const scope=new URL(req.url,'http://localhost').searchParams.get('sessionId');
+  res.writeHead(200,{'Content-Type':'application/x-ndjson; charset=utf-8','Cache-Control':'no-store','X-Accel-Buffering':'no'});res.flushHeaders();
+  let previous=null;
+  const emit=()=>{const active=[...inputPresence].some(([id,expires])=>expires>Date.now()&&(!scope||scope===id));if(active!==previous&&!res.destroyed){previous=active;res.write(JSON.stringify({active})+'\n');}};
+  presenceListeners.add(emit);emit();
+  const heartbeat=setInterval(()=>{if(!res.destroyed)res.write('\n');},15000);
+  res.on('close',()=>{clearInterval(heartbeat);presenceListeners.delete(emit);});return;
+ }
  if(req.method==='POST'&&req.url==='/control/input-presence'){
   try {let body='';for await(const chunk of req){body+=chunk;if(Buffer.byteLength(body)>4096){send(413,{error:'请求过大'});return;}}
    const data=JSON.parse(body);if(typeof data.sessionId!=='string'||data.sessionId.length>128||typeof data.active!=='boolean'){send(400,{error:'无效输入状态'});return;}
    for(const [key,expires] of inputPresence)if(expires<Date.now())inputPresence.delete(key);
    if(data.active)inputPresence.set(data.sessionId,Date.now()+4000);else inputPresence.delete(data.sessionId);
+   notifyPresence();
    send(200,{ok:true});
   }catch{send(400,{error:'无效输入状态'});}return;
  }

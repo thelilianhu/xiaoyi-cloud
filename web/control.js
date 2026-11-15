@@ -25,7 +25,7 @@ function linkedText(node,text){
 function button(text,action,className){const b=el('button',text,className);b.type='button';b.onclick=action;return b;}
 function badge(status){return el('span',labels[status]||status,'status '+status);}
 function notice(text){$('notice').textContent=text;}
-async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json();if(!r.ok){const e=new Error(d.error||'请求失败');e.status=r.status;throw e;}return d;}
+async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{throw new Error('后台连接暂时中断，正在重连…');}if(!r.ok){const e=new Error(d.error||'请求失败');e.status=r.status;throw e;}return d;}
 function setBusy(){ $('submit').disabled=false;$('input').disabled=false;}
 function actions(task){return task.status==='queued'?[['pause','暂停'],['cancel','取消']]:task.status==='running'?[['cancel','取消']]:task.status==='waiting_input'?[['cancel','取消']]:task.status==='paused'?[['resume','继续'],['cancel','取消']]:task.status==='failed'?[['retry','重试']]:[];}
 async function act(task,action,b){b.disabled=true;try{await api('/tasks/'+task.id+'/'+action,{version:task.version});notice('Task 操作已提交。');signature='';await refresh();}catch(e){notice(e.message);b.disabled=false;signature='';await refresh();}}
@@ -226,12 +226,13 @@ async function refresh(){
  if(runReturned||taskReturned||(replyChanged&&!previous?.reply))returnArrowUntil=Date.now()+5000;
  if(runReturned||taskReturned||replyChanged){returnFlowUntil=Date.now()+3500;setTimeout(()=>{if(snapshot)renderFlow();},3550);}
  snapshot=s;
+ if(/访问口令|连接暂时中断|连接不上|Unexpected token|not valid JSON/.test($('notice').textContent))notice('');
  $('connection').textContent='● 已连接 · '+(s.model||'模型未配置');$('scope-note').textContent=scope==='current'?'只看本页对话创建的任务':'查看全部会话的任务';$('updated').textContent='更新于 '+new Date().toLocaleTimeString();
  const next=JSON.stringify(s);if(next!==signature){signature=next;render();}else{renderFlow();}
- $('flow-input').classList.toggle('voice-active',Boolean(voiceSession||s.inputActive));
+ if(!presenceConnected)$('flow-input').classList.toggle('voice-active',Boolean(voiceSession||s.inputActive));
  $('link-input-router').classList.toggle('link-active',Date.now()<inputFlowUntil);
 
- }catch(e){notice(e.message);$('connection').textContent='○ 连接异常';if(e.status===401){$('connection').textContent='○ 请在设置中更新访问口令';}}finally{refreshing=false;}
+ }catch(e){notice(e.status?e.message:'后台暂时连接不上，正在重试…');$('connection').textContent='○ 连接异常';if(e.status===401){$('connection').textContent='○ 请在设置中更新访问口令';}}finally{refreshing=false;}
 }
 let composing=false;
 $('input').addEventListener('compositionstart',()=>{composing=true;});
@@ -306,3 +307,23 @@ voiceButton.addEventListener('contextmenu',e=>e.preventDefault());
 window.addEventListener('blur',()=>{if(voiceSession?.held)cancelVoice('已取消录音，没有发送。');});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&voiceSession)cancelVoice('已取消录音，没有发送。');});
 if(!SpeechRecognitionAPI||!window.isSecureContext)voiceHint('此环境暂不支持网页语音，可用手机键盘语音转文字后点击发送。');
+
+// Input presence is pushed separately from the heavier task snapshot.
+let presenceConnected=false,presenceController=null,presenceKey='',presenceRetryAt=0;
+async function ensurePresence(){
+ const scope=$('scope').value==='current'?sessionId:'';
+ const key=token+'|'+scope;
+ if(presenceController&&presenceKey===key)return;
+ if(Date.now()<presenceRetryAt)return;
+ presenceController?.abort();
+ const controller=new AbortController();presenceController=controller;presenceKey=key;
+ try{
+  const r=await fetch('/control/presence-stream'+(scope?'?sessionId='+encodeURIComponent(scope):''),{headers:{Authorization:'Bearer '+token},signal:controller.signal,cache:'no-store'});
+  if(!r.ok||!r.headers.get('content-type')?.includes('application/x-ndjson'))throw Error('offline');
+  presenceConnected=true;
+  const reader=r.body.getReader(),decoder=new TextDecoder();let buffer='';
+  while(!controller.signal.aborted){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let end;while((end=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,end);buffer=buffer.slice(end+1);if(line.trim()){const event=JSON.parse(line);$('flow-input').classList.toggle('voice-active',Boolean(voiceSession||event.active));}}}
+ }catch{}finally{if(presenceController===controller){presenceConnected=false;presenceController=null;presenceRetryAt=Date.now()+1500;}}
+}
+setInterval(()=>{if(!document.hidden)ensurePresence();},500);
+ensurePresence();

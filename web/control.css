@@ -156,3 +156,5 @@ dialog{background:#142136;color:#e2e8f0;border:1px solid #405571}dialog::backdro
 @media(max-width:520px){.control-workspace #flow-router{height:88px;min-height:88px;max-height:88px;padding:8px 12px}}
 
 #link-input-router.link-idle{visibility:hidden}
+
+.control-workspace #query-focus{display:none}
