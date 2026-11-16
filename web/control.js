@@ -23,7 +23,7 @@ function linkedText(node,text){
  return node;
 }
 function button(text,action,className){const b=el('button',text,className);b.type='button';b.onclick=action;return b;}
-function badge(status){return el('span',labels[status]||status,'status '+status);}
+function badge(status){const b=el('span',null,'status '+status);if(['waiting_input','cancelled','succeeded'].includes(status)){const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('width','14');icon.setAttribute('height','14');icon.setAttribute('aria-hidden','true');icon.style.cssText='vertical-align:-2px;margin-right:4px';const path=document.createElementNS(icon.namespaceURI,'path');path.setAttribute('d',status==='waiting_input'?'M4 4h16v12H9l-5 4V4Z':status==='cancelled'?'M5 5h14v14H5Z':'m4 12 5 5L20 6');path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');path.setAttribute('stroke-width','2');icon.append(path);b.append(icon);}b.append(document.createTextNode(labels[status]||status));return b;}
 function notice(text){$('notice').textContent=text;}
 async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{throw new Error('后台连接暂时中断，正在重连…');}if(!r.ok){if(r.status===401)location.replace('/login');const e=new Error(d.error||'请求失败');e.status=r.status;throw e;}return d;}
 function setBusy(){ $('submit').disabled=false;$('input').disabled=false;}

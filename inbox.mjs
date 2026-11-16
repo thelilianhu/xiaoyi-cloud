@@ -1,3 +1,4 @@
+import {deviceLocation} from './device-location.mjs';
 import {randomUUID} from 'node:crypto';
 import {readFileSync,writeFileSync,renameSync,mkdirSync} from 'node:fs';
 import {dirname} from 'node:path';
@@ -6,13 +7,13 @@ import {TaskError} from './tasks.mjs';
 export class TriggerInbox {
  constructor({file,harness}){this.file=file;this.harness=harness;this.clearingSessions=new Set();this.closed=false;try{this.items=JSON.parse(readFileSync(file,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;this.items=[];}this.timer=setInterval(()=>this.pump(),250);this.timer.unref();queueMicrotask(()=>this.pump());}
  persist(){mkdirSync(dirname(this.file),{recursive:true,mode:0o700});writeFileSync(this.file+'.tmp',JSON.stringify(this.items),{mode:0o600});renameSync(this.file+'.tmp',this.file);}
- accept({sessionId,requestId,message}){
+ accept({sessionId,requestId,message,location}){
   for(const [value,max] of [[sessionId,128],[requestId,128],[message,12000]])if(typeof value!=='string'||!value.trim()||value.length>max||['__proto__','constructor','prototype'].includes(value))throw new TaskError(400,'事件参数无效。');
   if(this.clearingSessions.has(sessionId))throw new TaskError(409,"会话正在清空，请稍后重试。");
   const old=this.items.find(i=>i.sessionId===sessionId&&i.requestId===requestId);if(old){if(old.message!==message)throw new TaskError(409,'请求标识已用于其他内容。');return structuredClone(old);}
   if(this.closed)throw new TaskError(503,'事件入口已停止。');
   if(this.items.filter(i=>['queued','routing'].includes(i.status)).length>=100)throw new TaskError(429,'事件队列已满，请稍后重试。');
-  const item={id:randomUUID(),sessionId,requestId,message,source:'web',status:'queued',createdAt:new Date().toISOString(),runId:null,error:null};this.items.push(item);
+  const item={id:randomUUID(),sessionId,requestId,message,...(location?{location:deviceLocation(location)}:{}),source:'web',status:'queued',createdAt:new Date().toISOString(),runId:null,error:null};this.items.push(item);
   try{this.persist();}catch(e){this.items.pop();throw e;}queueMicrotask(()=>this.pump());return structuredClone(item);
  }
  cancel(id,sessionId){
@@ -29,7 +30,7 @@ export class TriggerInbox {
    const run=this.harness.get(item.runId);if(!['queued','running'].includes(run.status)){item.status=run.status;item.finishedAt=new Date().toISOString();item.error=run.error;changed=true;}
   }
   if(item.status!=='queued')continue;
-  try{const run=this.harness.submit({sessionId:item.sessionId,requestId:'trigger-'+item.id,message:item.message});item.runId=run.id;item.status='routing';changed=true;}
+  try{const run=this.harness.submit({sessionId:item.sessionId,requestId:'trigger-'+item.id,message:item.message,location:item.location});item.runId=run.id;item.status='routing';changed=true;}
   catch(e){if([409,429,503].includes(e.status))continue;item.status='failed';item.error='事件路由失败，请检查 Router 状态。';changed=true;}
  }
  if(changed)this.persist();
