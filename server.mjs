@@ -1,5 +1,6 @@
 import {withDemoFallback} from './demo-fallback.mjs';
 import {clearSession} from './session-clear.mjs';
+import {createBrowserAuth} from './browser-auth.mjs';
 import {createLocalAccess} from './local-access.mjs';
 import {webSearch} from './web-search.mjs';
 import {simulatePhone} from './phone-simulator.mjs';
@@ -23,6 +24,7 @@ const notifyPresence = () => { for (const emit of presenceListeners) emit(); };
 setInterval(notifyPresence, 500).unref();
 const port = Number(process.env.PORT || 4390);
 const localAccess = createLocalAccess(port);
+const browserAuth = createBrowserAuth();
 const host = process.env.HOST || '127.0.0.1';
 const token = process.env.API_ACCESS_TOKEN;
 if (host !== '127.0.0.1' && !token) throw new Error('局域网访问必须配置 API_ACCESS_TOKEN');
@@ -77,6 +79,9 @@ const harness = new Harness({file:process.env.HARNESS_STORE_PATH || fileURLToPat
  model:args=>model({...args,reasoningEffort:chatReasoningEffort}),registry:toolRegistry(tasks),timeoutMs:modelTimeoutMs});
 const inbox=new TriggerInbox({file:process.env.INBOX_STORE_PATH||fileURLToPath(new URL('./data/inbox.json',import.meta.url)),harness});
 const webAssets = new Map([
+ ['/login',['login.html','text/html; charset=utf-8']],
+ ['/login.js',['login.js','text/javascript; charset=utf-8']],
+ ['/login.css',['login.css','text/css; charset=utf-8']],
  ['/control', ['control.html','text/html; charset=utf-8']],
  ['/control.js', ['control.js','text/javascript; charset=utf-8']],
  ['/control.css', ['control.css','text/css; charset=utf-8']],
@@ -96,6 +101,8 @@ const server = http.createServer(async (req, res) => {
  res.setHeader('Access-Control-Allow-Methods','POST, GET, OPTIONS');
  const send=(status,data)=>{res.writeHead(status).end(JSON.stringify(data));};
  if(req.method==='OPTIONS'){res.writeHead(204).end();return;}
+ if(await browserAuth.handle(req,res,send))return;
+ if(req.method==='GET'&&['/','/control'].includes(req.url)&&browserAuth.enabled&&!browserAuth.accepts(req)&&req.headers.authorization!==`Bearer ${token}`&&!localAccess.accepts(req)){res.writeHead(302,{Location:'/login'}).end();return;}
  const asset=webAssets.get(req.url);
  if(req.method==='GET'&&asset){
   if(['/control','/','/index.html'].includes(req.url))localAccess.grant(req,res);
@@ -105,7 +112,7 @@ const server = http.createServer(async (req, res) => {
   res.writeHead(200).end(asset.body);return;
  }
  if(req.method==='GET'&&req.url==='/readyz'){const ready=Boolean(process.env.MODEL_API_KEY&&process.env.MODEL_NAME&&!tasks.closed&&!harness.closed&&!inbox.closed);send(ready?200:503,{ready});return;}
- if(token && req.headers.authorization!==`Bearer ${token}` && !localAccess.accepts(req)){send(401,{error:'请检查回复服务访问口令。'});return;}
+ if(token && req.headers.authorization!==`Bearer ${token}` && !localAccess.accepts(req) && !browserAuth.accepts(req)){send(401,{error:'请检查回复服务访问口令。'});return;}
  if(req.method==='GET'&&req.url==='/control/local-access'){
   res.setHeader('Cache-Control','no-store');
   if(!localAccess.accepts(req)){send(403,{error:'仅允许本机中控页面读取默认访问口令。'});return;}

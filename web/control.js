@@ -25,7 +25,7 @@ function linkedText(node,text){
 function button(text,action,className){const b=el('button',text,className);b.type='button';b.onclick=action;return b;}
 function badge(status){return el('span',labels[status]||status,'status '+status);}
 function notice(text){$('notice').textContent=text;}
-async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{throw new Error('后台连接暂时中断，正在重连…');}if(!r.ok){const e=new Error(d.error||'请求失败');e.status=r.status;throw e;}return d;}
+async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{throw new Error('后台连接暂时中断，正在重连…');}if(!r.ok){if(r.status===401)location.replace('/login');const e=new Error(d.error||'请求失败');e.status=r.status;throw e;}return d;}
 function setBusy(){ $('submit').disabled=false;$('input').disabled=false;}
 function actions(task){return task.status==='queued'?[['pause','暂停'],['cancel','取消']]:task.status==='running'?[['cancel','取消']]:task.status==='waiting_input'?[['cancel','取消']]:task.status==='paused'?[['resume','继续'],['cancel','取消']]:task.status==='failed'?[['retry','重试']]:[];}
 async function act(task,action,b){b.disabled=true;try{await api('/tasks/'+task.id+'/'+action,{version:task.version});notice('Task 操作已提交。');signature='';await refresh();}catch(e){notice(e.message);b.disabled=false;signature='';await refresh();}}
@@ -256,7 +256,7 @@ $('clear-tasks').onclick=async()=>{
  catch(error){notice(error.message);}
  finally{$('clear-tasks').disabled=false;}
 };
-async function loadDefaultAccess(){if(token){refresh();return;}try{const r=await fetch('/control/local-access',{cache:'no-store'});if(r.ok){const d=await r.json();if(d.accessToken){token=d.accessToken;localStorage.setItem('xiaoyi-lab-access-token',token);$('token').value=token;}}}catch{}finally{refresh();}}
+async function loadDefaultAccess(){try{const r=await fetch('/auth/session');const d=await r.json();if(d.authenticated){token='';localStorage.removeItem('xiaoyi-lab-access-token');$('token').value='';$('logout').hidden=false;refresh();return;}if(d.enabled&&!token){location.replace('/login');return;}}catch{}if(token){refresh();return;}try{const r=await fetch('/control/local-access',{cache:'no-store'});if(r.ok){const d=await r.json();if(d.accessToken){token=d.accessToken;localStorage.setItem('xiaoyi-lab-access-token',token);$('token').value=token;}}}catch{}finally{refresh();}}
 setBusy();loadDefaultAccess();setInterval(()=>{if(!document.hidden&&!$('config').open)refresh();},500);
 
 function setChatVisible(visible){
@@ -327,3 +327,5 @@ async function ensurePresence(){
 }
 setInterval(()=>{if(!document.hidden)ensurePresence();},500);
 ensurePresence();
+
+$('logout').onclick=async()=>{try{await api('/auth/logout',{});localStorage.removeItem('xiaoyi-lab-access-token');location.replace('/login');}catch(e){notice(e.message);}};
