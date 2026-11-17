@@ -1,6 +1,6 @@
 import {setTimeout as delay} from 'node:timers/promises';
 // In-memory simulation only. This module has no device, network or payment API.
-export async function simulatePhone(task, signal, report, stepMs=3000) {
+export async function simulatePhone(task, signal, report, stepMs=undefined) {
  const app=task.input.match(/淘宝|小红书|京东|美团|饿了么|拼多多|微信|支付宝/)?.[0]||task.input.match(/(?:去|打开|进入|使用)\s*[「“"]?([^\n，。！？「」“”"]{1,24}?)[」”"]?\s*(?:应用|App|APP)/)?.[1]?.trim()||'任务工作区';
  const shopping=/买|购买|下单|牛奶|购物/.test(task.input);
  const defaultSteps=shopping?[
@@ -45,13 +45,17 @@ export async function simulatePhone(task, signal, report, stepMs=3000) {
   :/相册|照片|(?:查找|找|筛选|整理|挑选).*图片/.test(task.input)?['梳理照片查找条件','查找相关照片','按时间与主题筛选','挑选清晰照片','去除重复画面','整理挑选结果']
   :/图像|图片|海报|插画|绘画/.test(task.input)?['理解画面需求','设计主体构图','确定色彩与风格','生成画面','优化画面细节','检查成图效果']
   :/邮件|邮箱|email/i.test(task.input)?['梳理邮件处理要求','读取待处理邮件','分类筛选邮件','提炼重点事项','准备回复内容','核对处理结果']:null;
- const labels=planned.length>=2?planned:categorySteps;
+ const labels=shopping?null:planned.length>=4?planned:categorySteps;
  const steps=labels?labels.map(label=>['simulate_step',label,label,'执行画面']):defaultSteps;
  for(let i=0;i<steps.length;i++){
   signal.throwIfAborted();const [action,label,target,screen]=steps[i];const start=Date.now();
-  const input={app,action,target,step:i+1,total:steps.length,expectedDurationMs:stepMs};
+  // Pace simulation by the work shown, not by a single fixed timer. Explicit test timing remains supported.
+  const duration=stepMs ?? (action==='simulate_step'
+   ? /生成|合成|剪辑/.test(label)?18000:/检索|查找|筛选|资料|读取/.test(label)?12000:/检查|核对/.test(label)?8000:10000
+   : action==='wait'?6500:action==='type'?5000:action==='swipe'?4500:action==='open_app'?4500:3500);
+  const input={app,action,target,step:i+1,total:steps.length,expectedDurationMs:duration};
   report({type:'tool_started',name:'mock_phone.'+action,label,input,simulated:true,screen,total:steps.length,step:i+1});
-  await delay(stepMs,undefined,{signal});signal.throwIfAborted();
+  await delay(duration,undefined,{signal});signal.throwIfAborted();
   report({type:'tool_result',name:'mock_phone.'+action,label,simulated:true,screen,total:steps.length,step:i+1,durationMs:Date.now()-start,result:{simulated:true,success:true,screen,realOrderCreated:false,paymentMade:false}});
  }
  return '【模拟手机操控 · 未操作真实手机】\n已按你的需求完成 '+app+' 的逐步操作演示：\n'+steps.map((s,i)=>`${i+1}. ${s[1]}`).join('\n')+'\n\n这只是模拟流程；没有真实下单、支付或发送信息。商品、规格和页面均为演示数据。';
