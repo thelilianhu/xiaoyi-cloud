@@ -215,3 +215,8 @@ dialog{max-width:calc(100vw - 24px);max-height:calc(100dvh - 32px);overflow:auto
 @media(prefers-reduced-motion:reduce){.control-workspace *{scroll-behavior:auto}}
 .module-grid article{background:#17253a;border-color:#30445f}.module-grid h3{color:#e2e8f0}.module-grid p,.module-grid small{color:#a4b6cf}
 @media(min-width:1001px){.filters{flex:0 1 600px}.filters input{flex:1 1 200px}}
+
+/* Control task cards keep a 3:2 landscape footprint regardless of content. */
+.control-workspace #task-nodes{grid-template-columns:repeat(auto-fill,300px);grid-auto-rows:200px;align-content:start;justify-content:start;overflow:auto}
+.control-workspace .task-node{box-sizing:border-box;width:300px;height:200px;min-width:300px;max-width:300px;min-height:200px;max-height:200px;aspect-ratio:3 / 2;overflow:hidden}
+.control-workspace .task-node .step-info{min-height:0;flex:1;overflow:auto}
