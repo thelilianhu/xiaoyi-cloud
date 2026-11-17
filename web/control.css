@@ -116,7 +116,6 @@ dialog{background:#142136;color:#e2e8f0;border:1px solid #405571}dialog::backdro
 .input-row.reply-hidden{grid-template-columns:minmax(0,1fr);max-width:300px}
 
 /* 正在执行的 Step info 以扫光提示持续有新进展，不影响文字阅读。 */
-.steps-live{position:relative;isolation:isolate;overflow:hidden}.steps-live::after{content:'';position:absolute;z-index:0;pointer-events:none;inset:0 auto 0 -48%;width:38%;background:linear-gradient(105deg,transparent 0%,#7dd3fc00 25%,#bae6fd33 50%,#7dd3fc00 75%,transparent 100%);transform:skewX(-18deg);animation:step-sweep 2.4s ease-in-out infinite}.steps-live>*{position:relative;z-index:1}@keyframes step-sweep{0%,18%{transform:translateX(0) skewX(-18deg);opacity:0}30%{opacity:1}76%{opacity:1}100%{transform:translateX(420%) skewX(-18deg);opacity:0}}@media(prefers-reduced-motion:reduce){.steps-live::after{animation:none;opacity:.35;transform:translateX(210%) skewX(-18deg)}}
 
 /* 已取消的任务保留可追溯信息，但整体退到背景层。 */
 .control-workspace .task-node.task-cancelled{opacity:.42;filter:grayscale(1) saturate(.15);border-color:#4b5563;background:#182233}.control-workspace .task-node.task-cancelled .task-card-title{color:#a8b1bf}.control-workspace .task-node.task-cancelled .phone-preview{border-color:#596273;color:#a8b1bf;background:#1d2635}
