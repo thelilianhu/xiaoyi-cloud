@@ -29,5 +29,15 @@ export function taskAcknowledgement(tool, task, action, recent=[]) {
  // Prefer the least recently used sentence opening, independent of task names.
  const shape=s=>String(s).replace(/“[^”]*”/g,'“任务”').split(/[，。]/)[0];
  const history=recent.map(shape);
- return options.reduce((best,item)=>history.lastIndexOf(shape(item))<history.lastIndexOf(shape(best))?item:best);
+ const reply=options.reduce((best,item)=>history.lastIndexOf(shape(item))<history.lastIndexOf(shape(best))?item:best);
+ const text=String(task.name||'')+' '+String(task.input||'');
+ const longTask=task.kind==='research'||tool==='create_research_task'||/深度研究|调研|详细.*攻略|旅行|行程|日游|ppt|幻灯|演示文稿|视频|短片|动画|批量|整份|整本/i.test(text);
+ if(!longTask || tool==='control_task')return reply;
+ const notices=/ppt|幻灯|演示文稿/i.test(text)
+  ?['内容和排版需要一点时间，做好后发你。','这份 PPT 需要花点时间整理，做好后给你看。']
+  :/视频|短片|动画/.test(text)
+  ?['制作需要一点时间，做好后发你。','这个会花点时间，完成后在这里发你。']
+  :['资料整理需要一点时间，整理好后发你。','这个可能要一会儿，整理好后在这里给你。','我需要花点时间梳理，稍后把结果发你。'];
+ const notice=notices.find(n=>!recent.some(r=>String(r).includes(n)))||notices[0];
+ return reply+notice;
 }
