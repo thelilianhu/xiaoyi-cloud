@@ -1,3 +1,4 @@
+import {deviceLocation} from './device-location.mjs';
 import {externalFetch} from './external-fetch.mjs';
 async function json(url,signal,fetchImpl){
  const response=await fetchImpl(url,{signal,redirect:'error',headers:{Accept:'application/json'}});
@@ -6,17 +7,27 @@ async function json(url,signal,fetchImpl){
  try{while(true){const {value,done}=await reader.read();if(done)break;size+=value.length;if(size>500000)throw Error('天气返回异常');chunks.push(value);}}finally{await reader.cancel();}
  return JSON.parse(Buffer.concat(chunks).toString());
 }
-export async function getWeather({city,country_code,days=3},{signal,fetchImpl=externalFetch}={}){
+export function weatherPlace(args, location){
+ if(typeof args.city==='string'&&args.city.trim())return {...args,locationSource:'specified'};
+ const current=deviceLocation(location);
+ if(current.available)return {...args,city:current.city||'当前位置',latitude:current.latitude,longitude:current.longitude,locationSource:'device'};
+ return {...args,city:'深圳',country_code:'CN',locationSource:'default'};
+}
+export async function getWeather({city,country_code,days=3,latitude,longitude,locationSource},{signal,fetchImpl=externalFetch}={}){
  if(typeof city!=='string'||!city.trim()||city.length>100||!Number.isInteger(days)||days<1||days>7||country_code&&!/^[A-Z]{2}$/.test(country_code))throw Error('请提供城市名称、可选的两位国家代码，以及 1–7 天范围。');
  const timeout=AbortSignal.timeout(15000);const combined=signal?AbortSignal.any([signal,timeout]):timeout;
+ const byCoordinates=Number.isFinite(latitude)&&Number.isFinite(longitude)&&Math.abs(latitude)<=90&&Math.abs(longitude)<=180;
+ let p;
+ const location=p=>({name:p.name,region:p.admin1,country:p.country,country_code:p.country_code});
+ if(byCoordinates){p={name:city,latitude,longitude};}else{
  const geo=new URL('https://geocoding-api.open-meteo.com/v1/search');geo.search=new URLSearchParams({name:city.trim(),count:'5',language:'zh',format:'json',...(country_code?{countryCode:country_code}:{})}).toString();
  const places=(await json(geo,combined,fetchImpl)).results||[];
  if(!places.length)return {needsClarification:true,question:'没找到这个城市，请补充城市名称和所在国家。'};
- const location=p=>({name:p.name,region:p.admin1,country:p.country,country_code:p.country_code});
  // Never silently choose between places in different countries.
  if(!country_code&&new Set(places.map(p=>p.country_code)).size>1)return {needsClarification:true,question:'有几个同名地点，你指的是哪一个？',candidates:places.map(location)};
- const p=places[0];if(!Number.isFinite(p.latitude)||!Number.isFinite(p.longitude))throw Error('城市坐标不可用');
+ p=places[0];}
+ if(!Number.isFinite(p.latitude)||!Number.isFinite(p.longitude))throw Error('城市坐标不可用');
  const url=new URL('https://api.open-meteo.com/v1/forecast');url.search=new URLSearchParams({latitude:String(p.latitude),longitude:String(p.longitude),timezone:'auto',forecast_days:String(days),current:'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m',daily:'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max'}).toString();
  const data=await json(url,combined,fetchImpl);if(!data.current||!data.daily)throw Error('天气数据不完整，请稍后重试。');
- return {provider:'Open-Meteo',source:'https://open-meteo.com/',simulated:false,fetchedAt:new Date().toISOString(),location:location(p),timezone:data.timezone,current:data.current,current_units:data.current_units,daily:data.daily,daily_units:data.daily_units,note:'当前天气为气象模型估计，预报不是保证；时间按查询城市时区。请注明城市和数据时间，不推断用户当前位置。'};
+ return {provider:'Open-Meteo',source:'https://open-meteo.com/',simulated:false,fetchedAt:new Date().toISOString(),location:location(p),locationSource:locationSource||'specified',usedDefault:locationSource==='default',timezone:data.timezone,current:data.current,current_units:data.current_units,daily:data.daily,daily_units:data.daily_units,note:'当前天气为气象模型估计，预报不是保证；时间按查询城市时区。请注明城市和数据时间，不推断用户当前位置。'};
 }
