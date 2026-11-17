@@ -98,6 +98,9 @@ export class TaskQueue {
   if (action === 'update') {
    if (typeof input !== 'string' || !input.trim() || input.length > 12000) throw new TaskError(400, '任务内容无效。');
    const fields = {input, name: taskName(input, name)};
+   const context=fields.name+' '+input+' '+task.name;
+   const label=/旅行|旅游|攻略|行程|日游/.test(context)?'调整旅行行程':/买|商品|购物|牛奶|淘宝|京东/.test(context)?'更新商品要求':/PPT|ppt|幻灯|汇报/.test(context)?'调整汇报内容':/文案|文本|文章/.test(context)?'调整文本要求':/视频|短片/.test(context)?'调整视频要求':/照片|相册|图片/.test(context)?'更新筛选条件':'更新任务要求';
+   fields.steps=[...(task.steps||[]),{type:'intent_updated',label,at:new Date().toISOString(),attempt:task.attempts}];
    if(task.kind==='phone_simulation')fields.simulationPlan=typeof plan==='string'?plan.slice(0,2000):null;
    if(task.kind==='research')fields.searchQuery=input.slice(0,400);
    if(task.pendingQuestion){fields.pendingQuestion=null;fields.questions=(task.questions||[]).map(q=>q.answer===null?{...q,answer:input,answeredAt:new Date().toISOString()}:q);}
