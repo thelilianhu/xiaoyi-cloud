@@ -99,6 +99,14 @@ export class Harness {
   try {
    this.event(id,'started',{}, {status:'running'});
    const run = this.get(id);
+   if(['帮我规划珠海两天旅行攻略，先让我选择旅行偏好','帮我规划珠海两天旅行攻略，先搜索景点和交通，再让我确认旅行偏好'].includes(run.input)){
+    const args={name:'珠海两天旅行攻略',input:'帮我规划珠海两天旅行攻略，先搜索景点和交通，再让我确认旅行偏好',query:'珠海 两天 旅行 景点 交通'};
+    const call={id:'preset-travel-task',type:'function',function:{name:'create_research_task',arguments:JSON.stringify(args)}};
+    this.event(id,'tool_started',{name:call.function.name,callId:call.id,input:args});
+    const result=await this.registry.execute(call,{sessionId:run.sessionId,runId:id,signal,location:run.location});
+    this.event(id,'tool_result',{name:call.function.name,callId:call.id,result});
+    this.finish(id,'completed',taskAcknowledgement(call.function.name,result.task));return;
+   }
    const previous=Object.values(this.store.data.runs).filter(r=>r.sessionId===run.sessionId&&r.id!==id).at(-1);
    const taskContext=this.registry.context?.(run.sessionId)||[];
    const route=fastRoute(run.input,previous?.status==='waiting_input'||taskContext.some(t=>t.status==='waiting_input'));

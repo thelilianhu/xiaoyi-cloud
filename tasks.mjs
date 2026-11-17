@@ -75,11 +75,11 @@ export class TaskQueue {
   queueMicrotask(() => this.pump());
   return structuredClone(task);
  }
- ask(id, question, runId) {
+ ask(id, question, runId, options = []) {
   const task=this.get(id);
   const existing=(task.questions||[]).find(q=>q.runId===runId);
   if(existing)return structuredClone(task);
-  const result=this.change(task,'waiting_input',{questions:[...(task.questions||[]),{runId,question,at:new Date().toISOString(),answer:null}],pendingQuestion:question});
+  const result=this.change(task,'waiting_input',{questions:[...(task.questions||[]),{runId,question,at:new Date().toISOString(),answer:null}],pendingQuestion:question,pendingOptions:Array.isArray(options)?[...new Set(options.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.slice(0,80)))].slice(0,4):[]});
   this.running.get(id)?.abort();return result;
  }
  action(id, action, {input, name, version, plan} = {}) {
@@ -103,7 +103,7 @@ export class TaskQueue {
    fields.steps=[...(task.steps||[]),{type:'intent_updated',label,at:new Date().toISOString(),attempt:task.attempts}];
    if(task.kind==='phone_simulation')fields.simulationPlan=typeof plan==='string'?plan.slice(0,2000):null;
    if(task.kind==='research')fields.searchQuery=input.slice(0,400);
-   if(task.pendingQuestion){fields.pendingQuestion=null;fields.questions=(task.questions||[]).map(q=>q.answer===null?{...q,answer:input,answeredAt:new Date().toISOString()}:q);}
+   if(task.pendingQuestion){fields.pendingQuestion=null;fields.pendingOptions=[];fields.questions=(task.questions||[]).map(q=>q.answer===null?{...q,answer:input,answeredAt:new Date().toISOString()}:q);}
    if (!['queued','paused'].includes(task.status)) {
     fields.revisions = [...(task.revisions || []), {input:task.input, name:task.name, result:task.result, completedAt:task.updatedAt, status:task.status, version:task.version}];
     fields.result = null; fields.error = null;
