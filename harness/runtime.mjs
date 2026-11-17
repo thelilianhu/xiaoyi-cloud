@@ -142,12 +142,13 @@ export class Harness {
      const recorded=results.some(e=>['create_text_task','create_research_task','create_phone_task','control_task','ask_user'].includes(e.name)&&e.result?.task?.id);
      const claimsSubmission=/(?:已|已经)(?:成功)?(?:提交|创建|新建|建立|登记|安排|启动)(?:了)?(?:任务|文字任务|后台任务)?/.test(answer.content);
      const clearRequest=/^(?:请|麻烦)?(?:帮我|给我|为我).{0,12}(?:写|做|创建|调研|分析|制定|规划|整理|生成)/.test(run.input.trim())&&!/不要|不用|别|取消|是否|能不能|可以吗|[？?]/.test(run.input);
+     const appAssignment=/(?:去|在|用|打开|进入).{0,8}(?:小红书|淘宝|京东|拼多多|美团|微信|支付宝|饿了么|App|APP|应用).{0,24}(?:查|搜|找|买|订|发|整理|筛选|操作)/.test(run.input)&&!/(?:不要|不用|别).{0,8}(?:去|打开|进入)|(?:怎么|如何|能不能|是否).{0,12}(?:去|用|打开|进入)/.test(run.input);
      const capabilityLimit=/能力尚未接入|不支持(?:联网|发送|操作|文件)|没有(?:联网|外部工具)能力/.test(answer.content);
-     if(!recorded&&(claimsSubmission||(clearRequest&&!capabilityLimit))){
+     if(!recorded&&(claimsSubmission||appAssignment||(clearRequest&&!capabilityLimit))){
       if(receiptRepair)throw Error('任务未登记，不能确认提交。');
       receiptRepair=true;this.event(id,'submission_check',{reason:'missing_task_receipt'});
       this.partials.set(id,'');
-      messages.push({role:'assistant',content:answer.content},{role:'system',content:'执行校验：本轮没有成功登记或更新任何任务。不得说已提交。若用户明确委托且在文字能力范围内，立即调用 create_text_task；找不到旧任务就按本轮明确需求新建。需要关键补充时用 ask_user 的 input/name 先登记等待补充。若只是问答、拒绝或超出能力，调用 ask_user 解释边界，不得伪造成功。'});
+      messages.push({role:'assistant',content:answer.content},{role:'system',content:'执行校验：本轮没有成功登记或更新任何任务。不得说已提交。若用户明确委托，必须调用匹配的创建工具：文字产出用 create_text_task，研究用 create_research_task，去小红书等应用查找或操作用 create_phone_task（本产品已授权模拟）。不能仅口头答应，也不要退化成普通问答。找不到旧任务就按本轮明确需求新建。需要关键补充时用 ask_user 的 input/name 先登记等待补充。若只是问答、拒绝或超出能力，调用 ask_user 解释边界，不得伪造成功。'});
       continue;
      }
      this.finish(id,'completed',answer.content); return;

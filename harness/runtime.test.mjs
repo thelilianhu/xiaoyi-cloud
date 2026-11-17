@@ -170,3 +170,18 @@ test('device location reaches tool only for the submitting turn',async t=>{
  await done(harness,first.id);assert.equal(response.city,'长沙');assert.equal(harness.get(first.id).input,'我在哪里');
  await done(harness,harness.submit(input('再查我的位置','r2')).id);assert.equal(response.available,false);
 });
+
+test('colloquial app assignment must create a task before acknowledging',async t=>{
+ let calls=0;
+ const message='去小红书给我查一下那个长沙的一些旅行攻略情况';
+ const {harness,queue}=setup(t,async()=>++calls===1?say('好的，我去小红书看看长沙旅行攻略的相关情况。'):tool(call('create_phone_task',{name:'查找长沙旅行攻略',input:message})));
+ const run=await done(harness,harness.submit(input(message)).id);
+ assert.equal(run.status,'completed');assert.equal(queue.list('s1').length,1);
+ assert.equal(queue.list('s1')[0].kind,'phone_simulation');assert.equal(calls,2);
+ assert.ok(run.events.some(e=>e.type==='submission_check'));
+});
+test('app how-to question stays conversational without creating a task',async t=>{
+ const {harness,queue}=setup(t,async()=>say('可以在小红书搜索长沙攻略。'));
+ const run=await done(harness,harness.submit(input('如何去小红书查长沙攻略？')).id);
+ assert.equal(run.status,'completed');assert.equal(queue.list('s1').length,0);
+});
