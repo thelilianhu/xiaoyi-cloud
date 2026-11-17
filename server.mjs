@@ -52,7 +52,7 @@ const tasks = new TaskQueue({
    try{sources=await webSearch(query,{signal});report({type:'tool_result',name:'web_search',result:sources,durationMs:Date.now()-started,simulated:false});}catch(error){report({type:'tool_result',name:'web_search',result:{error:error.message},durationMs:Date.now()-started,simulated:false});throw error;}}
   if(travel&&task.input.includes('再让我确认旅行偏好')&&!(task.questions||[]).length){
    report({type:'analysis',label:'结合景点与交通信息梳理两天游玩方向'});
-   tasks.ask(task.id,'这次旅行更想怎么玩？选一个方向，我再细化两天的路线。','travel-preference-'+task.id,['轻松看海','美食探店','亲子游玩','人文漫步']);
+   tasks.ask(task.id,'这次旅行更想怎么玩？可以选择多个方向，我再细化两天的路线。','travel-preference-'+task.id,['轻松看海','美食探店','亲子游玩','人文漫步']);
    return '';
   }
   const stagedPresentation=research&&/ppt|幻灯|演示文稿/i.test(task.name+' '+task.input);
