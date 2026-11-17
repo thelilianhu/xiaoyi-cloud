@@ -1,3 +1,4 @@
+import {shoppingConfirmation,shoppingPrompt} from './shopping-confirmation.mjs';
 import {travelClarification} from './travel-clarification.mjs';
 import {withDemoFallback} from './demo-fallback.mjs';
 import {clearSession} from './session-clear.mjs';
@@ -47,6 +48,7 @@ const tasks = new TaskQueue({
  concurrency:taskConcurrency,
  file: process.env.TASK_STORE_PATH || fileURLToPath(new URL('./data/tasks.json', import.meta.url)),
  execute: withDemoFallback(async (task, signal, report) => {
+  if((task.originalInput||task.input)===shoppingPrompt)return shoppingConfirmation(task,signal,report,(...args)=>tasks.ask(...args));
   if(task.kind==='phone_simulation')return simulatePhone(task,signal,report);
   const research=task.kind==='research';const travel=/旅行|旅游|攻略|行程|日游/.test(task.input);let sources;
   if(research){const started=Date.now();const query=task.searchQuery||task.name||task.input.slice(0,200);report({type:'tool_started',name:'web_search',label:travel?'联网搜索目的地旅行信息':'检索参考资料',input:{query},simulated:false});

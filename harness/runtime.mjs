@@ -1,3 +1,4 @@
+import {shoppingPrompt,shoppingOptions} from '../shopping-confirmation.mjs';
 import {deviceLocation} from '../device-location.mjs';
 import {taskAcknowledgement} from './acknowledgement.mjs';
 import {fastRoute,taskListReply} from './fast-route.mjs';
@@ -99,6 +100,14 @@ export class Harness {
   try {
    this.event(id,'started',{}, {status:'running'});
    const run = this.get(id);
+   if(run.input===shoppingPrompt){
+    const args={name:'淘宝买牛奶',input:shoppingPrompt};
+    const call={id:'preset-shopping-task',type:'function',function:{name:'create_phone_task',arguments:JSON.stringify(args)}};
+    this.event(id,'tool_started',{name:call.function.name,callId:call.id,input:args});
+    const result=await this.registry.execute(call,{sessionId:run.sessionId,runId:id,signal,location:run.location});
+    this.event(id,'tool_result',{name:call.function.name,callId:call.id,result});
+    this.finish(id,'completed','好的，我帮你去淘宝找款合适的牛奶。付款前把品牌、规格和总价给你确认。');return;
+   }
    if(['帮我规划珠海两天旅行攻略，先让我选择旅行偏好','帮我规划珠海两天旅行攻略，先搜索景点和交通，再让我确认旅行偏好'].includes(run.input)){
     const args={name:'珠海两天旅行攻略',input:'帮我规划珠海两天旅行攻略，先搜索景点和交通，再让我确认旅行偏好',query:'珠海 两天 旅行 景点 交通'};
     const call={id:'preset-travel-task',type:'function',function:{name:'create_research_task',arguments:JSON.stringify(args)}};
@@ -109,6 +118,15 @@ export class Harness {
    }
    const previous=Object.values(this.store.data.runs).filter(r=>r.sessionId===run.sessionId&&r.id!==id).at(-1);
    const taskContext=this.registry.context?.(run.sessionId)||[];
+   const shoppingPending=taskContext.filter(t=>t.status==='waiting_input'&&t.input===shoppingPrompt);
+   if(shoppingPending.length===1&&run.input.startsWith('关于「'+shoppingPending[0].name+'」的补充：选择')&&shoppingOptions.every(o=>run.input.includes(o))){
+    const task=shoppingPending[0],args={taskId:task.id,action:'update',version:task.version,name:task.name,input:task.input+'\n用户已核对：'+shoppingOptions.join('、')};
+    const call={id:'confirm-shopping',type:'function',function:{name:'control_task',arguments:JSON.stringify(args)}};
+    this.event(id,'tool_started',{name:call.function.name,callId:call.id,input:args});
+    const result=await this.registry.execute(call,{sessionId:run.sessionId,runId:id,signal,location:run.location});
+    this.event(id,'tool_result',{name:call.function.name,callId:call.id,result});
+    this.finish(id,'completed','收到，品牌、规格、数量和总价都确认了，我继续处理这笔订单的演示流程。');return;
+   }
    const route=fastRoute(run.input,previous?.status==='waiting_input'||taskContext.some(t=>t.status==='waiting_input'));
    if(route){
     this.event(id,'fast_route',{route:route.kind});
