@@ -1,3 +1,4 @@
+import {travelClarification} from './travel-clarification.mjs';
 import {withDemoFallback} from './demo-fallback.mjs';
 import {clearSession} from './session-clear.mjs';
 import {createBrowserAuth} from './browser-auth.mjs';
@@ -50,9 +51,10 @@ const tasks = new TaskQueue({
   const research=task.kind==='research';const travel=/旅行|旅游|攻略|行程|日游/.test(task.input);let sources;
   if(research){const started=Date.now();const query=task.searchQuery||task.name||task.input.slice(0,200);report({type:'tool_started',name:'web_search',label:travel?'联网搜索目的地旅行信息':'检索参考资料',input:{query},simulated:false});
    try{sources=await webSearch(query,{signal});report({type:'tool_result',name:'web_search',result:sources,durationMs:Date.now()-started,simulated:false});}catch(error){report({type:'tool_result',name:'web_search',result:{error:error.message},durationMs:Date.now()-started,simulated:false});throw error;}}
-  if(travel&&task.input.includes('再让我确认旅行偏好')&&!(task.questions||[]).length){
-   report({type:'analysis',label:'结合景点与交通信息梳理两天游玩方向'});
-   tasks.ask(task.id,'这次旅行更想怎么玩？可以选择多个方向，我再细化两天的路线。','travel-preference-'+task.id,['轻松看海','美食探店','亲子游玩','人文漫步']);
+  const clarification=travel?travelClarification(task,sources):null;
+  if(clarification){
+   report({type:'analysis',label:clarification.label});
+   tasks.ask(task.id,clarification.question,'travel-preference-'+task.id,clarification.options);
    return '';
   }
   const stagedPresentation=research&&/ppt|幻灯|演示文稿/i.test(task.name+' '+task.input);
